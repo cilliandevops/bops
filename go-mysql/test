@@ -1,0 +1,257 @@
+<template>
+  <div>
+    <a-form :form="form" @finish="handleSubmit">
+      <a-form-item label="姓名" name="name">
+        <a-input v-model:value="user.name" />
+      </a-form-item>
+      <a-form-item label="年龄" name="age">
+        <a-input-number v-model:value="user.age" />
+      </a-form-item>
+      <a-form-item>
+        <a-button type="primary" html-type="submit">提交</a-button>
+      </a-form-item>
+    </a-form>
+
+    <a-table :columns="columns" :dataSource="users">
+      <template #name="text">
+        <a @click="handleEdit(text.id)">编辑</a>
+      </template>
+      <template #action="text">
+        <a @click="handleDelete(text.id)">删除</a>
+      </template>
+    </a-table>
+  </div>
+</template>
+
+<script lang="ts">
+import { defineComponent, ref } from 'vue';
+import { Form, Input, InputNumber, Button, Table } from 'ant-design-vue';
+import axios from 'axios';
+
+interface User {
+  id?: number;
+  name: string;
+  age: number;
+}
+
+export default defineComponent({
+  components: { Form, Input, InputNumber, Button, Table },
+  setup() {
+    const form = ref(null);
+    const columns = [
+      { title: 'ID', dataIndex: 'id' },
+      { title: '姓名', dataIndex: 'name' },
+      { title: '年龄', dataIndex: 'age' },
+      { title: '操作', slots: { customRender: 'action' } },
+      { title: '编辑', slots: { customRender: 'name' } },
+    ];
+    const users = ref<User[]>([]);
+    const user = ref<User>({ name: '', age: 0 });
+
+    const getUsers = async () => {
+      const res = await axios.get('/api/users');
+      users.value = res.data;
+    };
+    const addUser = async () => {
+      await axios.post('/api/users', user.value);
+      getUsers();
+    };
+    const updateUser = async (id: number) => {
+      await axios.put(`/api/users/${id}`, user.value);
+      getUsers();
+    };
+    const deleteUser = async (id: number) => {
+      await axios.delete(`/api/users/${id}`);
+      getUsers();
+    };
+    const handleEdit = (id: number) => {
+      const selectedUser = users.value.find((u) => u.id === id);
+      if (selectedUser) {
+        user.value = { ...selectedUser };
+      }
+    };
+    const handleDelete = (id: number) => {
+      deleteUser(id);
+    };
+    const handleSubmit = () => {
+      if (user.value.id) {
+        updateUser(user.value.id);
+      } else {
+        addUser();
+      }
+      user.value = { name: '', age: 0 };
+      form.value.resetFields();
+    };
+
+    getUsers();
+
+    return {
+      form,
+      columns,
+      users,
+      user,
+      handleEdit,
+      handleDelete,
+      handleSubmit,
+    };
+  },
+});
+</script>
+
+
+----
+<template>
+  <div>
+    <!-- 用户信息表格 -->
+    <a-button type="primary" @click="showAddUserModal">添加用户</a-button>
+    <a-table :dataSource="users" :columns="columns" rowKey="id">
+      <template #action="{ record }">
+        <a-space>
+             <!-- 添加用户按钮 -->
+          <a-button type="primary" @click="showEditUserModal(record)">编辑</a-button>
+          <a-button type="danger" @click="deleteUser(record.id)">删除</a-button>
+        </a-space>
+      </template>
+    </a-table>
+
+
+    <!-- 添加用户对话框 -->
+    <a-modal
+      v-model:visible="addUserModalVisible"
+      title="添加用户"
+      okText="确认"
+      cancelText="取消"
+      @ok="addUser"
+      @cancel="resetAddUserForm"
+    >
+      <a-form>
+        <input type="text" v-model="addUserForm.name">
+        <a-form-item label="姓名">
+          <a-input v-model="addUserForm.name" />
+        </a-form-item>
+        <a-form-item label="年龄">
+          <a-input-number v-model="addUserForm.age" />
+        </a-form-item>
+      </a-form>
+    </a-modal>
+
+    <!-- 编辑用户对话框 -->
+    <a-modal
+      v-model:visible="editUserModalVisible"
+      title="编辑用户"
+      okText="确认"
+      cancelText="取消"
+      @ok="editUser"
+    >
+      <a-form>
+        <a-form-item label="姓名">
+          <a-input v-model="editUserForm.name" />
+        </a-form-item>
+        <a-form-item label="年龄">
+          <a-input-number v-model="editUserForm.age" />
+        </a-form-item>
+      </a-form>
+    </a-modal>
+  </div>
+</template>
+
+<script lang="ts">
+import { defineComponent, reactive, ref } from 'vue'
+import axios from 'axios'
+
+export default defineComponent({
+  setup() {
+    // 用户数据
+    const users = ref([])
+
+    // 获取用户数据
+    const fetchUsers = async () => {
+      const response = await axios.get('http://localhost:8089/users')
+      users.value = response.data
+    }
+
+    // 表格列配置
+    const columns = [
+      { title: 'ID', dataIndex: 'id', key: 'id' },
+      { title: '姓名', dataIndex: 'name', key: 'name' },
+      { title: '年龄', dataIndex: 'age', key: 'age' },
+      {
+        title: '操作',
+        key: 'action',
+        slots: { customRender: 'action' },
+      },
+    ]
+
+    // 添加用户对话框
+    const addUserModalVisible = ref(false)
+    const addUserForm = reactive({ name: '', age: 0 })
+
+    // 显示添加用户对话框
+    const showAddUserModal = () => {
+      addUserModalVisible.value = true
+    }
+
+    // 添加用户
+    const addUser = async () => {
+
+      try {
+        await axios.post('http://localhost:8089/users', addUserForm)
+      } catch (err) {
+        console.error(err)
+      }
+      addUserModalVisible.value = false
+      fetchUsers()
+      resetAddUserForm()
+    }
+
+    // 重置添加用户表单
+    const resetAddUserForm = () => {
+      addUserForm.name = ''
+      addUserForm.age = 0
+    }
+
+    // 编辑用户对话框
+    const editUserModalVisible = ref(false)
+    const editUserForm = reactive({ id: 0, name: '', age: 0 })
+
+    // 显示编辑用户对话框
+    const showEditUserModal = (user) => {
+      editUserForm.id = user.id
+      editUserForm.name = user.name
+      editUserForm.age = user.age
+      editUserModalVisible.value = true
+    }
+
+    // 编辑用户
+    const editUser = async () => {
+      await axios.put(`http://localhost:8089/users/${editUserForm.id}`, editUserForm)
+      editUserModalVisible.value = false
+      fetchUsers()
+    }
+
+    // 删除用户
+    const deleteUser = async (id) => {
+      await axios.delete(`http://localhost:8089/users/${id}`)
+      fetchUsers()
+    }
+
+    // 初始化
+    fetchUsers()
+
+    return {
+      users,
+      columns,
+      addUserModalVisible,
+      addUserForm,
+      showAddUserModal,
+      addUser,
+      resetAddUserForm,
+      editUserModalVisible,
+      editUserForm,
+      showEditUserModal,
+      editUser,
+      deleteUser,
+    }
+  },
+})
+</script>
